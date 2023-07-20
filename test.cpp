@@ -7,6 +7,7 @@
 #include <functional>
 #include <algorithm>
 #include "unistd.h"
+#include <set>
 using namespace std;
 vector <long long> value_table(26);
 int saving_account_number = 1000000;
@@ -54,7 +55,15 @@ public:
     int card_cvv;
     string card_expiry_date="You dont have an atm card";
 };
+ class  ATM {
+    public:
+    long long account_number;
+    string card_number ;
+    string card_cvv;
+    string card_expiry_date;
+    int pin;
 
+ };
 
 // Class for Savings Account
 class SavingsAccount : public Account {
@@ -128,6 +137,7 @@ public:
     static const double home_loan_interest;
     static const double car_loan_interest;
     static const double personal_loan_interest;
+
     static const double business_loan_interest;
     static const double minimum_loan_duration ;
 };
@@ -175,6 +185,8 @@ public:
     map <long long ,vector<Transaction>> transactions;
     map<long long, vector<LoanAccount>> loan; // map of customer id to loan accounts
     map <long long, Account> number_account;
+    set <long long> ids;
+    map <long long ,ATM> cards;
 
    //maps customer id to loan accounts
 
@@ -205,9 +217,14 @@ void create_value_table() {
 
 
     // Function to create a new user
-    void createUser(const string& username, const string& mobile_number, const string& email,
+    void createUser( string  username, const string& mobile_number, const string& email,
         const string& address, int age) {
         long long customer_id = generateCustomerID(username);
+        while(ids.find(customer_id)!=ids.end()){
+            cin >> username;
+            long long customer_id = generateCustomerID(username);
+
+        }
         User new_user;
         new_user.username = username;
         new_user.mobile_number = mobile_number;
@@ -307,6 +324,61 @@ void create_value_table() {
         }
 
     }
+    void createatm(long long account_number){
+        
+        if(account_number/1000000 !=1) {
+            cout<<"You need to have a savings account to have atm card"<<endl;
+            return;
+        }
+        if(number_account.find(account_number)== number_account.end()){
+            cout<<"Create a savings account to have an atm card"<<endl;
+            return;
+        }
+        ATM new_atm;
+        new_atm.account_number=account_number;
+        string card_number;
+            for(int i=0;i<16;i++){
+                char temp= 48 + (rand() % 9);
+                card_number=card_number+temp;
+            }
+            new_atm.card_number=card_number;
+            vector<int> date =day();
+            new_atm.card_expiry_date=to_string(date[0]) + "/" + to_string(date[1]) +
+                "/" + to_string(date[2]+3);//expires in 3 years after getting atm card
+            new_atm.card_cvv= 100 +(rand()%900);
+
+            new_atm.pin =1000+(rand()%9000);
+            cout<<"Pin code for your new atm card is :"<<new_atm.pin<<endl;
+            cards[account_number]=new_atm;
+
+    }
+    
+    void transaction_atm(long long account_number , double amount){
+        if(cards.find(account_number)== cards.end()){
+            cout<<"No atm cards availed on this account yet"<<endl;
+            return;
+        }
+        int pin=0;
+        cout<<"Enter pin :"<<endl;
+        cin>>pin;
+        while(pin!= cards[account_number].pin){
+            int t;
+            cout<<"Enter 1 to try again."<<endl;
+            cout<<"Enter 2 to exit."<<endl;
+            if(t==2) return;
+            cout<<"Enter pin :";
+            cin>>pin;
+        }
+        if(number_account[account_number].amount >= amount){
+            cout<<"Insufficient balance"<<endl;
+            return;
+
+        }
+        number_account[account_number].amount -= amount;
+        cout<<"Transaction of "<<amount<<" successfull"<<endl;
+        
+
+    }
 
     
 
@@ -343,16 +415,16 @@ void create_value_table() {
                 cin>>amount;
                 
             }
-            string card_number;
-            for(int i=0;i<16;i++){
-                char temp= 48 + (rand() % 9);
-                card_number=card_number+temp;
-            }
-            new_account.card_number=card_number;
-            vector<int> date =day();
-            new_account.card_expiry_date=to_string(date[0]) + "/" + to_string(date[1]) +
-                "/" + to_string(date[2]+3);//expires in 3 years after getting atm card
-            new_account.card_cvv= 100 +(rand()%900);
+            // string card_number;
+            // for(int i=0;i<16;i++){
+            //     char temp= 48 + (rand() % 9);
+            //     card_number=card_number+temp;
+            // }
+            // new_account.card_number=card_number;
+            // vector<int> date =day();
+            // new_account.card_expiry_date=to_string(date[0]) + "/" + to_string(date[1]) +
+            //     "/" + to_string(date[2]+3);//expires in 3 years after getting atm card
+            // new_account.card_cvv= 100 +(rand()%900);
 
             
 
@@ -424,7 +496,8 @@ void create_value_table() {
                     "/" + to_string(date[2]);
 
 
-            
+            cout<<"Enter loan amount"<<endl;
+            cin>>amount;
             new_account.customer_id = customer_id;
             new_account.loan_amount = amount;
             new_account.left_amount =amount;
@@ -516,12 +589,28 @@ void create_value_table() {
 
     // Function to perform a transaction (withdrawal or deposit) for a user
     void performTransaction(const string& username, int account_number, AccountType account_type, double amount, bool isWithdrawal, bool isDirect,bool isCharge = false) {
+        vector<int> date= day();
+        if(isDirect == false){
+
+            transaction_atm(account_number ,amount);
+            Transaction new_transaction;
+            new_transaction.amount =amount;
+            new_transaction.date= date[0];
+            new_transaction.month =date[1];
+            new_transaction.year = date[2];
+            new_transaction.isWithdrawl =isWithdrawal;
+            new_transaction.isDirect = isDirect;
+            new_transaction.isCharge= isCharge;
+            transactions[account_number].push_back(new_transaction);
+            return;
+
+        }
         
         long long customer_id = customer_ids[username];
         AccountType new_account_type= account_type;
         vector<Account>& customer_accounts = accounts[customer_id];
         Account new_account;
-        vector<int> date= day();
+        
 
         for (Account& account : customer_accounts) {
             
@@ -645,6 +734,10 @@ void create_value_table() {
     }
 
      void monthly_profit(long long account_number){
+        if(number_account.find(account_number) == number_account.end()) {
+            cout<<"Account number not valid";
+            return;
+        }
         number_account[account_number].customer_id;
         std::time_t now = std::time(nullptr);
         std::tm* current = std::localtime(&now);
@@ -702,6 +795,8 @@ void existing_users(Bank bank){
             cout<<"Press 2 if you want to see account details"<<endl;
             cout<<"Press 3 if you want to perform a transaction"<<endl;
             cout<<"Press 4 to print passbook"<<endl;
+            cout<<"Press 5 to make an atm card"<<endl;
+            cout<<"Press 6 to view your monthly profit"<<endl;
             cin>> act_type;
             if(act_type ==1){
                 bank.openAccount();
@@ -745,6 +840,18 @@ void existing_users(Bank bank){
                 cout<<"Enter account number :"<<endl;
                 cin>>account_number;
                 bank.Passbook(account_number);
+            }
+            else if (act_type == 5){
+                long long account_number;
+                cout<<"Enter account number"<<endl;
+                cin>>account_number;
+                bank.createatm(account_number);
+            }
+            else if (act_type == 6 ){
+                long long account_number;
+                cout<<"Enter account number"<<endl;
+                cin>>account_number;
+                bank.monthly_profit(account_number);
             }
             existing_users(bank);
         
