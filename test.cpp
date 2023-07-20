@@ -51,9 +51,7 @@ public:
     int year;
     int month;
     int day;
-    string card_number="You dont have an atm card";
-    int card_cvv;
-    string card_expiry_date="You dont have an atm card";
+    AccountType accounttype;
 };
  class  ATM {
     public:
@@ -119,6 +117,7 @@ const double CurrentAccount::charge_mandatory_transaction = 500.0;
 class LoanAccount {
 public:
     static const float minimum_time;
+    AccountType account_type;
     long long account_number;
     long long customer_id;
     double left_amount;
@@ -354,6 +353,7 @@ void create_value_table() {
     }
     
     void transaction_atm(long long account_number , double amount){
+        vector<int> date=day();
         if(cards.find(account_number)== cards.end()){
             cout<<"No atm cards availed on this account yet"<<endl;
             return;
@@ -369,11 +369,20 @@ void create_value_table() {
             cout<<"Enter pin :";
             cin>>pin;
         }
-        if(number_account[account_number].amount >= amount){
+        if(number_account[account_number].amount < amount){
             cout<<"Insufficient balance"<<endl;
             return;
 
         }
+        int l=transactions[account_number].size();
+        string username = users[number_account[account_number].customer_id].username;
+            if( l >5){
+                if(transactions[account_number][l-5].month == date[1]){
+                    performTransaction(username,account_number,AccountType::Savings,500,true,true);
+                    cout<<"You have been charged 500"<<endl;
+
+                }
+            }
         number_account[account_number].amount -= amount;
         cout<<"Transaction of "<<amount<<" successfull"<<endl;
         
@@ -467,6 +476,7 @@ void create_value_table() {
                 "/" + to_string(new_account.year);
 
             vector<Account>& customer_accounts = accounts[customer_id];
+            new_account.accounttype=account_type;
             accounts[customer_id].push_back(new_account);
             number_account[new_account.account_number] = new_account;
             
@@ -487,7 +497,7 @@ void create_value_table() {
             else {
                 LoanAccount new_account;
                 long long customer_id=customer_ids[username];
-                
+                AccountType account_type =AccountType::Loan;
                 vector<int> date=day();
                 new_account.day=date[0];
                 new_account.month=date[1];
@@ -501,6 +511,7 @@ void create_value_table() {
             new_account.customer_id = customer_id;
             new_account.loan_amount = amount;
             new_account.left_amount =amount;
+            new_account.account_type =AccountType::Loan;
             cout<<"Press 1 if you want to take Home lone"<<endl;
             cout<<"Press 2 if you want to take Car lone"<<endl;
             cout<<"Press 3 if you want to take Personal lone"<<endl;
@@ -588,7 +599,7 @@ void create_value_table() {
     }
 
     // Function to perform a transaction (withdrawal or deposit) for a user
-    void performTransaction(const string& username, int account_number, AccountType account_type, double amount, bool isWithdrawal, bool isDirect,bool isCharge = false) {
+    bool performTransaction(const string& username, int account_number, AccountType account_type, double amount, bool isWithdrawal, bool isDirect,bool isCharge = false) {
         vector<int> date= day();
         if(isDirect == false){
 
@@ -602,7 +613,8 @@ void create_value_table() {
             new_transaction.isDirect = isDirect;
             new_transaction.isCharge= isCharge;
             transactions[account_number].push_back(new_transaction);
-            return;
+
+            return true;
 
         }
         
@@ -622,6 +634,7 @@ void create_value_table() {
 
         if((new_account_type == AccountType::Savings || new_account_type == AccountType::Current)  and amount> new_account.amount and isWithdrawal ==true) {
             cout<<"Cant withdraw more than "<<new_account.amount<<endl;
+            return false;
         }
 
         
@@ -652,7 +665,8 @@ void create_value_table() {
                         
                     }
                     if(total_amount+ amount  > SavingsAccount::max_withdrawal_amount_day){
-                        cout<<"You cant withdraw more tha 20000";
+                        cout<<"You cant withdraw more than 20000";
+                        return false;
                     }
             }
             
@@ -683,13 +697,14 @@ void create_value_table() {
                         cout << "Withdrawal of " << amount << " successful!" << endl;
                     } else {
                         cout << "Insufficient funds for withdrawal!" << endl;
+                        return false;
                     }
                 } else {
                     account.amount += amount;
                     cout << "Deposit of " << amount << " successful!" << endl;
                     new_transaction.final_amount = account.amount;
                 }
-                return;
+                return true;
             }
         }
         vector<LoanAccount>& loan_customer_accounts = loan[customer_id];
@@ -702,16 +717,29 @@ void create_value_table() {
                     } else {
 
                         cout << "Insufficient funds for withdrawal!" << endl;
+                        return false;
                     }
                 } else {
                     account.loan_amount += amount;
                     cout << "Deposit of " << amount << " successful!" << endl;
                 }
-                return;
+                return true;
             }
         }
 
         
+    }
+    void Account_to_account_trasaction(long long account_number_one,long long account_number_two,double amount){
+        if(number_account.find(account_number_one) == number_account.end() || number_account.find(account_number_one) == number_account.end()){
+            cout<<"Accounts not found"<<endl;
+            return;
+        }
+        string username_one =users[number_account[account_number_one].customer_id].username;
+        string username_two =users[number_account[account_number_two].customer_id].username;
+
+        if (performTransaction(username_one,account_number_one,number_account[account_number_one].accounttype,amount,true,true)){
+            performTransaction(username_two,account_number_two,number_account[account_number_two].accounttype,amount,false,true);
+        }
     }
 
     void Passbook(long long account_number){
@@ -794,6 +822,7 @@ void existing_users(Bank bank){
             cout<<"Press 1 if you want to make an account"<<endl;
             cout<<"Press 2 if you want to see account details"<<endl;
             cout<<"Press 3 if you want to perform a transaction"<<endl;
+            cout<<"Press 7 if you want to perform transaction from bank to bank"<<endl;
             cout<<"Press 4 to print passbook"<<endl;
             cout<<"Press 5 to make an atm card"<<endl;
             cout<<"Press 6 to view your monthly profit"<<endl;
@@ -852,6 +881,19 @@ void existing_users(Bank bank){
                 cout<<"Enter account number"<<endl;
                 cin>>account_number;
                 bank.monthly_profit(account_number);
+            }
+            if(act_type ==7 ){
+                long long account_number_one,account_number_two;
+                double amount;
+                cout<<"Enter account number for the debiting account"<<endl;
+                cin>>account_number_one;
+                cout<<"Enter account number for crediting account"<<endl;
+                cin>>account_number_two;
+                cout<<"Enter ammount to transfer :"<<endl;
+                cin>> amount; 
+
+
+                bank.Account_to_account_trasaction(account_number_one,account_number_two,amount);
             }
             existing_users(bank);
         
